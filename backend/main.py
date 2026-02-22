@@ -3,13 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
 from bs4 import BeautifulSoup
-import asyncio
-from typing import List
+from typing import List, Optional
 import re
-from urllib.parse import urljoin
+from datetime import datetime
 import json
 
-app = FastAPI()
+# Import routes
+from routes.auth import router as auth_router
+from routes.cart import router as cart_router
+from routes.payment import router as payment_router
+from services.search_service import SearchService
+
+app = FastAPI(title="ECommerce API", version="2.0")
 
 # Enable CORS for frontend access
 app.add_middleware(
@@ -20,6 +25,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(auth_router)
+app.include_router(cart_router)
+app.include_router(payment_router)
+
 class Product(BaseModel):
     id: str
     name: str
@@ -27,6 +37,7 @@ class Product(BaseModel):
     image_url: str
     rating: str = "N/A"
     reviews: str = "0"
+    description: Optional[str] = None
 
 # Cache for scraped products
 products_cache = {}
@@ -47,47 +58,34 @@ def scrape_flipkart_search(search_query: str, max_products: int = 20) -> List[Pr
     Scrape Flipkart search results for given query
     """
     try:
-        # Create search URL
         search_url = f"https://www.flipkart.com/search?q={search_query.replace(' ', '+')}"
-        
         headers = get_flipkart_headers()
-        
-        # Make request with timeout
         response = requests.get(search_url, headers=headers, timeout=10)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.content, 'html.parser')
         products = []
-        
-        # Try to find product containers
         product_containers = soup.find_all('div', {'class': re.compile('col.*')})
         
         for container in product_containers[:max_products]:
             try:
-                # Extract product details
                 product_link = container.find('a', {'class': re.compile('_+1UQZyc')})
                 if not product_link:
                     continue
                 
                 product_url = product_link.get('href', '')
-                
-                # Get product name
                 name_elem = container.find('a', {'class': re.compile('s1Q50cAgFa')})
                 name = name_elem.text.strip() if name_elem else "Unknown Product"
                 
-                # Get price
                 price_elem = container.find('div', {'class': re.compile('_+30jeq3')})
                 price = price_elem.text.strip() if price_elem else "N/A"
                 
-                # Get image
                 img_elem = container.find('img')
                 image_url = img_elem.get('src', '') if img_elem else ""
                 
-                # Get rating
                 rating_elem = container.find('div', {'class': re.compile('_+1lRcqm')})
                 rating = rating_elem.text.strip() if rating_elem else "N/A"
                 
-                # Get review count
                 review_elem = container.find('span', {'class': re.compile('_+1oKavI')})
                 reviews = review_elem.text.strip() if review_elem else "0"
                 
@@ -98,7 +96,8 @@ def scrape_flipkart_search(search_query: str, max_products: int = 20) -> List[Pr
                         price=price,
                         image_url=image_url,
                         rating=rating,
-                        reviews=reviews
+                        reviews=reviews,
+                        description=f"High-quality {name}. Check our amazing deals!"
                     )
                     products.append(product)
                     
@@ -110,89 +109,95 @@ def scrape_flipkart_search(search_query: str, max_products: int = 20) -> List[Pr
         
     except requests.exceptions.RequestException as e:
         print(f"Request error: {e}")
-        # Return mock data if scraping fails
         return get_mock_products(search_query)
 
-def get_mock_products(search_query: str) -> List[Product]:
-    """
-    Return mock products when scraping fails
-    This includes sample data to demonstrate the application
-    """
+def get_mock_products(search_query: str = "electronics") -> List[Product]:
+    """Return mock products with detailed info"""
     mock_data = {
         "electronics": [
             {
-                "name": "Samsung Galaxy M31 (Space Black, 4GB RAM, 64GB Storage)",
-                "price": "₹9,999",
-                "image_url": "https://images.unsplash.com/photo-1511707267537-b85faf00021e?w=300",
-                "rating": "4.5",
-                "reviews": "15.2K"
-            },
-            {
-                "name": "Apple iPhone 12 (Blue, 64GB)",
-                "price": "₹54,999",
-                "image_url": "https://images.unsplash.com/photo-1556656793-08538906a9f8?w=300",
-                "rating": "4.7",
-                "reviews": "25.8K"
-            },
-            {
-                "name": "OnePlus 9 Pro (Pine Green, 8GB RAM, 128GB)",
+                "name": "Apple iPhone 15 (Black, 256GB)",
                 "price": "₹49,999",
-                "image_url": "https://images.unsplash.com/photo-1511367461989-f85a1664c5ad?w=300",
+                "image_url": "https://images.unsplash.com/photo-1592286927505-1def25115558?w=300",
+                "rating": "4.7",
+                "reviews": "28.5K",
+                "description": "Latest Apple iPhone 15 with advanced camera system"
+            },
+            {
+                "name": "Samsung Galaxy S24 (Graphite, 256GB)",
+                "price": "₹59,999",
+                "image_url": "https://images.unsplash.com/photo-1511707267537-b85faf00021e?w=300",
                 "rating": "4.6",
-                "reviews": "12.3K"
+                "reviews": "15.2K",
+                "description": "Premium Samsung smartphone with AMOLED display"
             },
             {
-                "name": "Redmi Note 10 Pro (Gradient Bronze, 6GB RAM, 64GB)",
-                "price": "₹15,999",
-                "image_url": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300",
-                "rating": "4.4",
-                "reviews": "8.9K"
-            },
-            {
-                "name": "POCO X3 Pro (Black, 6GB RAM, 128GB)",
-                "price": "₹18,999",
-                "image_url": "https://images.unsplash.com/photo-1585492841711-11584e18a59e?w=300",
+                "name": "OnePlus 12 (Pine Green, 256GB)",
+                "price": "₹44,999",
+                "image_url": "https://images.unsplash.com/photo-1556656793-08538906a9f8?w=300",
                 "rating": "4.5",
-                "reviews": "11.2K"
+                "reviews": "12.3K",
+                "description": "OnePlus flagship with fast charging and 120Hz display"
             },
             {
-                "name": "Motorola Moto G9 (Sapphire Green, 4GB RAM, 64GB)",
-                "price": "₹9,299",
-                "image_url": "https://images.unsplash.com/photo-1513149666159-fcf4e75d6a85?w=300",
-                "rating": "4.2",
-                "reviews": "6.5K"
+                "name": "Redmi Note 13 (Midnight Black, 256GB)",
+                "price": "₹17,999",
+                "image_url": "https://images.unsplash.com/photo-1511707267537-b85faf00021e?w=300",
+                "rating": "4.4",
+                "reviews": "18.9K",
+                "description": "Budget-friendly smartphone with great battery life"
+            },
+            {
+                "name": "Sony WH-1000XM5 Headphones",
+                "price": "₹24,999",
+                "image_url": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300",
+                "rating": "4.8",
+                "reviews": "8.2K",
+                "description": "Premium noise-cancelling wireless headphones"
+            },
+            {
+                "name": "iPad Air (10.9-inch, 256GB)",
+                "price": "₹59,900",
+                "image_url": "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=300",
+                "rating": "4.6",
+                "reviews": "5.1K",
+                "description": "Powerful tablet with M1 chip for professionals"
             },
         ],
         "clothing": [
             {
-                "name": "Men's Cotton T-Shirt (Blue)",
-                "price": "₹299",
+                "name": "Men's Premium Cotton T-Shirt (Blue)",
+                "price": "₹599",
                 "image_url": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300",
                 "rating": "4.3",
-                "reviews": "2.1K"
+                "reviews": "2.1K",
+                "description": "Comfortable and durable cotton t-shirt"
             },
             {
                 "name": "Women's Casual Shirt (White)",
-                "price": "₹399",
+                "price": "₹799",
                 "image_url": "https://images.unsplash.com/photo-1551028719-00167b16ebc5?w=300",
                 "rating": "4.5",
-                "reviews": "3.2K"
+                "reviews": "3.2K",
+                "description": "Stylish casual wear for everyday use"
             },
         ],
         "books": [
-            {
-                "name": "The Midnight Library by Matt Haig",
-                "price": "₹345",
-                "image_url": "https://images.unsplash.com/photo-1507842217343-583f1270b3fe?w=300",
-                "rating": "4.6",
-                "reviews": "1.8K"
-            },
             {
                 "name": "Atomic Habits by James Clear",
                 "price": "₹400",
                 "image_url": "https://images.unsplash.com/photo-1495446815901-a7297e01fb7d?w=300",
                 "rating": "4.7",
-                "reviews": "5.2K"
+                "reviews": "5.2K",
+                "description": "Transform your life with tiny habits"
+            },
+            {
+                "name": "The Midnight Library by Matt Haig",
+                "price": "₹345",
+                "image_url": "https://images.unsplash.com/photo-1507842217343-583f1270b3fe?w=300",
+                "rating": "4.6",
+                "reviews": "1.8K",
+                "description": "Explore infinite possibilities in this novel"
             },
         ]
     }
@@ -207,7 +212,8 @@ def get_mock_products(search_query: str) -> List[Product]:
             price=item['price'],
             image_url=item['image_url'],
             rating=item['rating'],
-            reviews=item['reviews']
+            reviews=item['reviews'],
+            description=item.get('description', 'Great product!')
         )
         products.append(product)
     
@@ -216,53 +222,102 @@ def get_mock_products(search_query: str) -> List[Product]:
 @app.get("/")
 async def root():
     """Root endpoint"""
-    return {"message": "Welcome to ECommerce API", "version": "1.0"}
+    return {
+        "message": "Welcome to ECommerce API v2.0",
+        "version": "2.0",
+        "endpoints": {
+            "auth": "/api/auth/*",
+            "cart": "/api/cart/*",
+            "payment": "/api/payment/*",
+            "products": "/api/search, /api/categories, /api/trending"
+        }
+    }
 
 @app.get("/api/search")
-async def search_products(q: str = "electronics", limit: int = 20) -> dict:
-    """
-    Search for products on Flipkart
-    Query parameters:
-    - q: search query (default: electronics)
-    - limit: max number of products to return (default: 20)
-    """
-    if not q or len(q) < 2:
-        raise HTTPException(status_code=400, detail="Query must be at least 2 characters")
+async def search_products(q: str = "electronics", limit: int = 20, sort_by: str = "relevant", min_price: float = 0, max_price: float = 100000) -> dict:
+    """Search for products with advanced filtering"""
+    if not q or len(q) < 1:
+        raise HTTPException(status_code=400, detail="Query must be at least 1 character")
     
     if limit > 100:
         limit = 100
     
-    # Check cache first
     cache_key = f"{q}_{limit}".lower()
+    
+    # Check cache
     if cache_key in products_cache:
-        return {"query": q, "products": products_cache[cache_key], "cached": True}
+        products = products_cache[cache_key]
+        cached = True
+    else:
+        products = scrape_flipkart_search(q, limit)
+        products_cache[cache_key] = [p.dict() for p in products]
+        cached = False
     
-    # Scrape or get mock data
-    products = scrape_flipkart_search(q, limit)
+    # Convert to dict for processing
+    products_list = [p.dict() if hasattr(p, 'dict') else p for p in products]
     
-    # Cache results
-    products_cache[cache_key] = [p.dict() for p in products]
+    # Apply search filter
+    products_list = SearchService.search_products(products_list, q)
+    
+    # Apply price filter
+    products_list = SearchService.filter_by_price(products_list, min_price, max_price)
+    
+    # Apply sorting
+    products_list = SearchService.sort_products(products_list, sort_by)
+    
+    # Limit results
+    products_list = products_list[:limit]
     
     return {
         "query": q,
-        "products": [p.dict() for p in products],
-        "cached": False,
-        "count": len(products)
+        "products": products_list,
+        "cached": cached,
+        "count": len(products_list),
+        "filters": {
+            "min_price": min_price,
+            "max_price": max_price,
+            "sort_by": sort_by
+        }
     }
+
+@app.get("/api/product/{product_id}")
+async def get_product_details(product_id: str) -> dict:
+    """Get detailed product information"""
+    # Search in cache or mock data
+    all_products = get_mock_products("electronics")
+    
+    for product in all_products:
+        if str(product.id) == product_id:
+            return {
+                "product": product.dict(),
+                "specifications": {
+                    "warranty": "1 year manufacturer warranty",
+                    "return_policy": "30 days return",
+                    "delivery": "Free delivery across India",
+                    "seller": "Authorized Seller",
+                    "cod_available": True
+                },
+                "offers": [
+                    {"text": "₹3,315 off with Credit Card", "code": "CARD3K"},
+                    {"text": "₹1,000 off with Debit Card", "code": "DB1000"}
+                ]
+            }
+    
+    raise HTTPException(status_code=404, detail="Product not found")
 
 @app.get("/api/categories")
 async def get_categories():
     """Get popular categories"""
     return {
         "categories": [
-            {"id": 1, "name": "Electronics", "icon": "📱"},
-            {"id": 2, "name": "Clothing", "icon": "👕"},
-            {"id": 3, "name": "Books", "icon": "📚"},
-            {"id": 4, "name": "Home & Kitchen", "icon": "🏠"},
-            {"id": 5, "name": "Sports", "icon": "⚽"},
-            {"id": 6, "name": "Beauty", "icon": "💄"},
-            {"id": 7, "name": "Toys", "icon": "🧸"},
-            {"id": 8, "name": "Groceries", "icon": "🛒"},
+            {"id": 1, "name": "Electronics", "icon": "📱", "count": 245},
+            {"id": 2, "name": "Clothing", "icon": "👕", "count": 892},
+            {"id": 3, "name": "Books", "icon": "📚", "count": 156},
+            {"id": 4, "name": "Home & Kitchen", "icon": "🏠", "count": 453},
+            {"id": 5, "name": "Sports", "icon": "⚽", "count": 203},
+            {"id": 6, "name": "Beauty", "icon": "💄", "count": 324},
+            {"id": 7, "name": "Toys", "icon": "🧸", "count": 178},
+            {"id": 8, "name": "Groceries", "icon": "🛒", "count": 521},
         ]
     }
 
@@ -271,13 +326,15 @@ async def get_trending():
     """Get trending products"""
     trending = get_mock_products("electronics")
     return {
-        "trending": [p.dict() for p in trending[:6]]
+        "trending": [p.dict() for p in trending[:6]],
+        "title": "Trending Now",
+        "last_updated": datetime.now().isoformat()
     }
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "Server is running"}
+    return {"status": "Server is running", "timestamp": datetime.now().isoformat()}
 
 if __name__ == "__main__":
     import uvicorn
