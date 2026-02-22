@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECommerce - Shop Like Flipkart</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header/Navbar -->
+    <header class="navbar">
+        <div class="navbar-container">
+            <div class="logo">
+                <h1>🛍️ ECommerce</h1>
+            </div>
+            
+            <div class="search-bar">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Search for products..." 
+                    class="search-input"
+                >
+                <button id="searchBtn" class="search-btn">Search</button>
+            </div>
+            
+            <div class="nav-icons">
+                <div class="icon-item">
+                    <span>🏠</span>
+                    <span class="icon-label">Home</span>
+                </div>
+                <div class="icon-item">
+                    <span>❤️</span>
+                    <span class="icon-label">Wishlist</span>
+                </div>
+                <div class="icon-item">
+                    <span>🛒</span>
+                    <span class="icon-label">Cart</span>
+                </div>
+                <div class="icon-item">
+                    <span>👤</span>
+                    <span class="icon-label">Account</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Categories Section -->
+    <section class="categories-section">
+        <div class="container">
+            <h2>Shop by Category</h2>
+            <div class="categories-grid" id="categoriesContainer">
+                <!-- Categories will be loaded here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Featured Products Section -->
+    <section class="featured-section">
+        <div class="container">
+            <h2>Trending Now</h2>
+            <div class="products-grid" id="trendingProducts">
+                <!-- Trending products will be loaded here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Products Section -->
+    <section class="products-section">
+        <div class="container">
+            <div class="section-header">
+                <h2 id="sectionTitle">All Products</h2>
+                <div class="sort-options">
+                    <button class="sort-btn active" onclick="sortProducts('relevant')">Relevant</button>
+                    <button class="sort-btn" onclick="sortProducts('price-low')">Price: Low to High</button>
+                    <button class="sort-btn" onclick="sortProducts('price-high')">Price: High to Low</button>
+                    <button class="sort-btn" onclick="sortProducts('rating')">Highest Rating</button>
+                </div>
+            </div>
+            
+            <div class="products-container">
+                <aside class="filters-sidebar">
+                    <div class="filter-group">
+                        <h3>Price Range</h3>
+                        <input type="range" min="0" max="100000" value="100000" id="priceRange" class="range-slider">
+                        <div id="priceDisplay">₹0 - ₹100000</div>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <h3>Rating</h3>
+                        <label>
+                            <input type="checkbox" class="rating-filter" value="4"> 4★ & Above
+                        </label>
+                        <label>
+                            <input type="checkbox" class="rating-filter" value="3"> 3★ & Above
+                        </label>
+                    </div>
+                </aside>
+                
+                <div class="products-grid" id="productsContainer">
+                    <!-- Products will be loaded here -->
+                    <div class="loading">Loading products...</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Modal -->
+    <div id="productModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="modal-body">
+                <div class="modal-image">
+                    <img id="modalImage" src="" alt="Product">
+                </div>
+                <div class="modal-details">
+                    <h2 id="modalName"></h2>
+                    <div class="modal-rating">
+                        <span id="modalRating"></span>
+                        <span id="modalReviews"></span>
+                    </div>
+                    <div class="modal-price">
+                        <h3 id="modalPrice"></h3>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-primary">Add to Cart</button>
+                        <button class="btn-secondary">Add to Wishlist</button>
+                    </div>
+                    <div class="modal-info">
+                        <p><strong>Delivery:</strong> Free delivery available</p>
+                        <p><strong>Return Policy:</strong> 30 days return policy</p>
+                        <p><strong>Warranty:</strong> 1 year manufacturer warranty</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>About Us</h4>
+                <p>Your one-stop shop for everything</p>
+            </div>
+            <div class="footer-section">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="#">Help Center</a></li>
+                    <li><a href="#">Contact Us</a></li>
+                    <li><a href="#">Privacy Policy</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Follow Us</h4>
+                <div class="social-links">
+                    <a href="#">Facebook</a>
+                    <a href="#">Twitter</a>
+                    <a href="#">Instagram</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 ECommerce. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
